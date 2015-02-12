@@ -39,7 +39,6 @@ Rtorrent.prototype.get = function( method, params, callback ) {
     });
     res.on('end',function( ) {
       data = xml2json(buff, {object:true}).methodResponse;
-      console.log(JSON.stringify(data));
 
       if (data.fault)
 	callback( {code: getValue(data.fault.value.struct.member[0].value), message: getValue(data.fault.value.struct.member[1].value) });
