@@ -2,14 +2,15 @@ var Rtorrent = require('./index.js');
 
 var rtorrent = new Rtorrent();
 
-// mode multicall
+// multicall
 rtorrent.get('d.multicall', ['default', 'd.name='], function (err, data) {
     if (err) return console.log('err: ', err);
 
     console.log(data);
 });
 
-// mode manuel
+
+// manual mode
 rtorrent.get('download_list', [], function (err, hashes) {
     if (err) return console.log('err: ', err);
 
@@ -17,6 +18,7 @@ rtorrent.get('download_list', [], function (err, hashes) {
 
     if (hashes.length)
     {
+	// get the name of the first torrent
         rtorrent.get('d.name', [hashes[0]], function (err, data) {
             if (err) return console.log('err: ', err);
 
@@ -24,3 +26,4 @@ rtorrent.get('download_list', [], function (err, hashes) {
         });
     }
 });
+

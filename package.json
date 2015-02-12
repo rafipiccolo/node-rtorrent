@@ -1,6 +1,6 @@
 {
   "name": "rtorrent-scgi",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "homepage": "https://github.com/rafi.piccolo/rtorrent-scgi",
   "description": "connect to rtorrent via scgi and retrieve everything !",
   "main": "index.js",
