@@ -2,6 +2,7 @@ var Rtorrent = require('./index.js');
 
 var rtorrent = new Rtorrent();
 
+/*
 // multicall
 rtorrent.get('d.multicall', ['default', 'd.name='], function (err, data) {
     if (err) return console.log('err: ', err);
@@ -26,4 +27,10 @@ rtorrent.get('download_list', [], function (err, hashes) {
         });
     }
 });
+*/
 
+rtorrent.getAll(function (err, data) {
+    if (err) return console.log('err: ', err);
+
+    console.log(data);
+});

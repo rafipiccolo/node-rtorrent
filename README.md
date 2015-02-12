@@ -13,10 +13,11 @@ connect to rtorrent via scgi and retrieve everything !
         path: '/'
     });
 
-    rtorrent.get('d.name', ['XXXXXXXXXXXXXX'], function (err, data) {
+    rtorrent.getAll(function (err, data) {
         if (err) return console.log('err: ', err);
 
         console.log(data);
+        [{hash: 'XXXXXX', name: 'ubuntu.iso', path: '/xxx', bitfield: ......... }, {...}]
     });
 
 ## More examples
