@@ -1,0 +1,29 @@
+{
+  "name": "rtorrent-scgi",
+  "version": "0.0.1",
+  "homepage": "https://github.com/rafi.piccolo/rtorrent-scgi",
+  "description": "connect to rtorrent via scgi and retrieve everything !",
+  "main": "index.js",
+  "scripts": {
+    "test": "test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafipiccolo/rtorrent-scgi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rafipiccolo/rtorrent-scgi/issues"
+  },
+  "dependencies": {
+    "url": ">=0.10.2",
+    "scgi-stream": ">=0.3.1",
+    "xmlbuilder": ">=2.4.5",
+    "xml2json": ">=0.5.1"
+  },
+  "author": "Raphael Piccolo <rafi.piccolo@gmail.com>",
+  "license": "MIT",
+  "keywords": [
+    "rtorrent",
+    "torrent"
+  ]
+}
