@@ -1,7 +1,7 @@
 # rtorrent-scgi
 connect to rtorrent via scgi and retrieve everything !
 
-## install
+## Install
     npm install rtorrent-scgi;
 
 ## Example
@@ -21,4 +21,4 @@ connect to rtorrent via scgi and retrieve everything !
 
 ## More examples
 
-[click here !](test.js)
+[Click here !](test.js)
