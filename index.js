@@ -6,24 +6,6 @@ var xml2json = require("xml2json").toJson;
 var async = require("async");
 var xmlrpc = require("xmlrpc");
 
-async.mapObject = function ( obj, func, cb ) {
-  var i, arr = [], keys = Object.keys( obj );
-  for ( i = 0; i < keys.length; i += 1 ) {
-    var wrapper = {};
-    wrapper[keys[i]] = obj[keys[i]];
-    arr[i] = wrapper;
-  }
-  this.map( arr, func, function( err, data ) {
-    if ( err ) { return cb( err ); }
-    var res = {};
-    for ( i = 0; i < data.length; i += 1 ) {
-        res[keys[i]] = data[i];
-    }
-    return cb( err, res );
-  });
-}
-
-
 function Rtorrent(option) {
     this.mode = (option && option['mode']) || "scgi";
     this.host = (option && option['host']) || "127.0.0.1";
@@ -137,71 +119,173 @@ Rtorrent.prototype.getValue = function(obj) {
         throw new Error('unknown value type : '+keys[0]);
 }
 
+
+Rtorrent.prototype.getMulticall = function(method, param, cmds, callback) {
+    var realthis = this;
+    var cmdarray = param;
+
+    for (var c in cmds)
+        cmdarray.push(cmds[c]+'=');
+
+    realthis.get(method, cmdarray, function (err, data) {
+        if (err) return callback(err);
+
+        var res = [];
+        for (var d in data)
+        {
+            var i = 0;
+            res[d] = {};
+            for (var c in cmds)
+                res[d][c] = data[d][i++];
+        }
+
+        callback(err, res);
+    });
+}
+
 Rtorrent.prototype.getAll = function(callback) {
-    var cmds = {
-        'hash': 'd.get_hash',
-        'name': 'd.get_name',
-        'torrent': 'd.get_tied_to_file',
-        'torrentsession': 'd.get_loaded_file',
-        'path': 'd.get_base_path',
-        'name': 'd.get_base_filename',
-        'complete': 'd.get_complete',
-        'size': 'd.get_size_bytes',
-        'skip': 'd.get_skip_total',
-        'completed': 'd.get_completed_bytes',
-        'down_rate': 'd.get_down_rate',
-        'down_total': 'd.get_down_total',
-        'up_rate': 'd.get_up_rate',
-        'up_total': 'd.get_up_total',
-        'ratio': 'd.ratio',
-        'message': 'd.get_message',
-        'bitfield': 'd.get_bitfield',
-        'chunk_size': 'd.get_chunk_size',
-        'chunk_completed': 'd.get_completed_chunks',
-        'files': 'd.get_size_files',
-        'createdAt': 'd.creation_date',
-        'trackersnb': 'd.get_tracker_size',
-        'filesnb': 'd.get_size_files',
-        'active': 'd.is_active',
-        'open': 'd.is_open',
-        'hashing': 'd.is_hash_checking',
-        'hashed': 'd.is_hash_checked',
-        'message': 'd.get_message',
-        'state': 'd.get_state',
-        'peers': 'd.get_peers_accounted',
-    };
     var realthis = this;
     var all = {};
 
-    this.get('download_list', [], function (err, hashes) {
+    realthis.getTorrents(function (err, torrents) {
         if (err) return console.log('err: ', err);
 
-        async.mapLimit(hashes, 1, function(hash, asyncCallback) {
-            async.mapObject(cmds, function(cmd, asyncCallback2) {
-                cmd = cmd[Object.keys(cmd)[0]];
+        all.torrents = torrents;
 
-                realthis.get(cmd, [hash], function (err, data) {
-                    if (err) return callback(err);
+        async.parallel([function (ac) {
 
-                    asyncCallback2(err, data)
-                });
-            }, function(err, results){
-                if (err) return callback(err);
+            realthis.getGlobal(ac);
 
-                asyncCallback(err, results)
-            });
-        }, function(err, results){
-            if (err) return callback(err);
+        },function (ac) {
 
-            all.torrents = results;
-            callback(err, results);
+            async.mapLimit(torrents, 1, function(torrent, asyncCallback) {
+                realthis.getTorrentTrackers(torrent, asyncCallback);
+            }, ac);
+
+        }, function (ac) {
+
+            async.mapLimit(torrents, 1, function(torrent, asyncCallback) {
+                realthis.getTorrentFiles(torrent, asyncCallback);
+            }, ac);
+
+        }], function (err, results) {
+
+            all = results[0];
+
+            for (var t in torrents) {
+                all.torrents[t].trackers = results[0][t];
+                all.torrents[t].files = results[1][t];
+            }
+            callback(err, all);
+
         });
         
     });
 }
 
 
+Rtorrent.prototype.getTorrents = function(callback) {
+    var realthis = this;
 
+    var cmds = {
+        hash: 'd.get_hash',
+        torrent: 'd.get_tied_to_file',
+        torrentsession: 'd.get_loaded_file',
+        path: 'd.get_base_path',
+        name: 'd.get_base_filename',
+        complete: 'd.get_complete',
+        size: 'd.get_size_bytes',
+        skip: 'd.get_skip_total',
+        completed: 'd.get_completed_bytes',
+        down_rate: 'd.get_down_rate',
+        down_total: 'd.get_down_total',
+        up_rate: 'd.get_up_rate',
+        up_total: 'd.get_up_total',
+        ratio: 'd.ratio',
+        message: 'd.get_message',
+        bitfield: 'd.get_bitfield',
+        chunk_size: 'd.get_chunk_size',
+        chunk_completed: 'd.get_completed_chunks',
+        files: 'd.get_size_files',
+        createdAt: 'd.creation_date',
+        trackersnb: 'd.get_tracker_size',
+        filesnb: 'd.get_size_files',
+        active: 'd.is_active',
+        open: 'd.is_open',
+        hashing: 'd.is_hash_checking',
+        hashed: 'd.is_hash_checked',
+        message: 'd.get_message',
+        state: 'd.get_state',
+        leechers: 'd.get_peers_accounted',
+        seeders: 'd.get_peers_complete',
+    };
+    realthis.getMulticall('d.multicall', ['main'], cmds, callback);
+}
+
+Rtorrent.prototype.getTorrentTrackers = function(torrent, callback) {
+    var realthis = this;
+
+    var cmds = {
+        url: 't.get_url',
+        min_interval: 't.get_min_interval',
+        normal_interval: 't.get_normal_interval',
+        scrape_complete: 't.get_scrape_complete',
+        scrape_downloaded: 't.get_scrape_downloaded',
+        scrape_incomplete: 't.get_scrape_incomplete',
+        scrape_time_last: 't.get_scrape_time_last',
+    };
+
+    async.timesSeries(torrent.trackersnb, function(n, asyncCallback){
+        realthis.getMulticall('t.multicall', [torrent.hash, n], cmds, asyncCallback);
+    }, callback);
+};
+
+Rtorrent.prototype.getTorrentFiles = function(torrent, callback) {
+    var realthis = this;
+
+    var cmds = {
+        range_first: 'f.get_range_first',
+        range_second: 'f.get_range_second',
+        size: 'f.get_size_bytes',
+        chunks: 'f.get_size_chunks',
+        completed_chunks: 'f.get_completed_chunks',
+        fullpath: 'f.get_frozen_path',
+        path: 'f.get_path',
+        priority: 'f.get_priority',
+    };
+
+    async.timesSeries(torrent.filesnb, function(n, asyncCallback) {
+        realthis.getMulticall('f.multicall', [torrent.hash, n], cmds, asyncCallback);
+    }, callback);
+}
+
+Rtorrent.prototype.getGlobal = function(callback) {
+    var realthis = this;
+
+    var cmds = {
+        up_rate: 'get_up_rate',
+        down_rate: 'get_down_rate',
+        up_total: 'get_up_total',
+        down_total: 'get_down_total',
+    };
+    var cmdarray = [];
+
+    for (var c in cmds)
+        cmdarray.push(cmds[c]+'=');
+
+    async.map(Object.keys(cmds), function(key, asyncCallback) {
+        realthis.get(cmds[key], [], asyncCallback);
+    }, function (err, data) {
+        if (err) return callback(err);
+        var res = {};
+
+        var i = 0;
+        for (var key in cmds) {
+            res[key] = data[i++];
+        };
+        callback(err, res);
+    });
+}
 
 module.exports = Rtorrent;
 

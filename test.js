@@ -14,12 +14,14 @@ var rtorrent = new Rtorrent({
     pass: config.pass
 });
 
+
+
+
 rtorrent.getAll(function (err, data) {
     if (err) return console.log('err: ', err);
 
-    console.log(data);
+    console.log(JSON.stringify(data, null, 4));
 });
-
 
 /*
 // manual mode
