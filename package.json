@@ -1,7 +1,7 @@
 {
-  "name": "rtorrent-scgi",
-  "version": "0.1.0",
-  "homepage": "https://github.com/rafi.piccolo/rtorrent-scgi",
+  "name": "node-rtorrent",
+  "version": "0.2.0",
+  "homepage": "https://github.com/rafi.piccolo/node-rtorrent",
   "description": "connect to rtorrent via scgi and retrieve everything !",
   "main": "index.js",
   "scripts": {
@@ -9,10 +9,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rafipiccolo/rtorrent-scgi.git"
+    "url": "https://github.com/rafipiccolo/node-rtorrent.git"
   },
   "bugs": {
-    "url": "https://github.com/rafipiccolo/rtorrent-scgi/issues"
+    "url": "https://github.com/rafipiccolo/node-rtorrent/issues"
   },
   "dependencies": {
     "url": ">=0.10.2",

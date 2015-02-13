@@ -1,16 +1,27 @@
 var Rtorrent = require('./index.js');
 
-var rtorrent = new Rtorrent();
+var yaml = require('js-yaml');
+var fs   = require('fs');
+var config = yaml.safeLoad(fs.readFileSync(__dirname+'/config.yml', 'utf8'));
 
-/*
-// multicall
-rtorrent.get('d.multicall', ['default', 'd.name='], function (err, data) {
+
+var rtorrent = new Rtorrent({
+    mode: config.mode,
+    host: config.host,
+    port: config.port,
+    path: config.path,
+    user: config.user,
+    pass: config.pass
+});
+
+rtorrent.getAll(function (err, data) {
     if (err) return console.log('err: ', err);
 
     console.log(data);
 });
 
 
+/*
 // manual mode
 rtorrent.get('download_list', [], function (err, hashes) {
     if (err) return console.log('err: ', err);
@@ -19,7 +30,7 @@ rtorrent.get('download_list', [], function (err, hashes) {
 
     if (hashes.length)
     {
-	// get the name of the first torrent
+        // get the name of the first torrent
         rtorrent.get('d.name', [hashes[0]], function (err, data) {
             if (err) return console.log('err: ', err);
 
@@ -27,10 +38,18 @@ rtorrent.get('download_list', [], function (err, hashes) {
         });
     }
 });
-*/
 
+// multicall : only with scgi
+rtorrent.get('d.multicall', ['default', 'd.name='], function (err, data) {
+    if (err) return console.log('err: ', err);
+
+    console.log(data);
+});
+
+// everything in one shot
 rtorrent.getAll(function (err, data) {
     if (err) return console.log('err: ', err);
 
     console.log(data);
 });
+*/

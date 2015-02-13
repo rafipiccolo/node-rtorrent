@@ -4,16 +4,102 @@ var scgi = require("scgi-stream")
 var xmlbuilder = require("xmlbuilder")
 var xml2json = require("xml2json").toJson;
 var async = require("async");
+var xmlrpc = require("xmlrpc");
 
-
-function Rtorrent(option) {
-    this.host = (option && option['host']) || "127.0.0.1";
-    this.port = (option && option['port']) || 5000;
-    this.path = (option && option['path']) || "/";
+async.mapObject = function ( obj, func, cb ) {
+  var i, arr = [], keys = Object.keys( obj );
+  for ( i = 0; i < keys.length; i += 1 ) {
+    var wrapper = {};
+    wrapper[keys[i]] = obj[keys[i]];
+    arr[i] = wrapper;
+  }
+  this.map( arr, func, function( err, data ) {
+    if ( err ) { return cb( err ); }
+    var res = {};
+    for ( i = 0; i < data.length; i += 1 ) {
+        res[keys[i]] = data[i];
+    }
+    return cb( err, res );
+  });
 }
 
 
-Rtorrent.prototype.makeSCGIXML = function( method, param ) {
+function Rtorrent(option) {
+    this.mode = (option && option['mode']) || "scgi";
+    this.host = (option && option['host']) || "127.0.0.1";
+    this.port = (option && option['port']) || 5000;
+    this.path = (option && option['path']) || "/";
+    this.user = (option && option['user']) || null;
+    this.pass = (option && option['pass']) || null;
+    this.client = null;
+    
+    if (this.mode == 'xmlrpc')
+    {
+        options = {
+            host: this.host,
+            port: this.port,
+            path: this.path,
+            headers: {
+                'User-Agent': 'NodeJS XML-RPC Client',
+                'Content-Type': 'text/xml',
+                'Accept': 'text/xml',
+                'Accept-Charset': 'UTF8',
+                'Connection': 'Close'
+            }
+        }
+
+        if (this.user && this.pass) {
+            options.basic_auth = {
+                user: this.user,
+                pass: this.pass
+            }
+        }
+
+        client = xmlrpc.createClient(options);
+    }
+    else if (this.mode == 'scgi')
+    {
+    }
+    else
+    {
+        throw new Error('unknown mode: '+this.mode+' (available: scgi/xmlrpc)');
+    }
+}
+
+Rtorrent.prototype.get = function(method, param, callback) {
+    if (this.mode == 'scgi')
+        return this.getScgi(method, param, callback);
+    else if (this.mode == 'xmlrpc')
+        return this.getXmlrpc(method, param, callback);
+}
+
+Rtorrent.prototype.getXmlrpc = function(method, params, callback ) {
+    client.methodCall(method, params, callback);
+};
+
+Rtorrent.prototype.getScgi = function(method, params, callback ) {
+    var content = this.makeSCGIXML(method, params)
+    var req = scgi.request(this)
+    var realthis = this;
+
+    req.on("response", function(res) {
+        var buff = "";
+        res.on('data',function(data ) {
+            buff += data;
+        });
+        res.on('end',function() {
+            data = xml2json(buff, {object:true}).methodResponse;
+
+            if (data.fault)
+                callback( {code: realthis.getValue(data.fault.value.struct.member[0].value), message: realthis.getValue(data.fault.value.struct.member[1].value) });
+            else
+                callback(null, realthis.getValue(data.params.param.value) );
+        });
+    })
+    req.end(content)
+};
+
+Rtorrent.prototype.makeSCGIXML = function(method, param ) {
     var root = xmlbuilder.create('methodCall')
     var methodName = root.ele("methodName", method)
     if ( typeof param == 'string' )
@@ -28,87 +114,9 @@ Rtorrent.prototype.makeSCGIXML = function( method, param ) {
     return root.end({pretty:false})
 }
 
-Rtorrent.prototype.get = function( method, params, callback ) {
-    var content = this.makeSCGIXML(method, params)
-    var req = scgi.request(this)
-
-    req.on("response", function(res) {
-        var buff = "";
-        res.on('data',function(data ) {
-            buff += data;
-        });
-        res.on('end',function( ) {
-            data = xml2json(buff, {object:true}).methodResponse;
-
-            if (data.fault)
-                callback( {code: getValue(data.fault.value.struct.member[0].value), message: getValue(data.fault.value.struct.member[1].value) });
-            else
-                callback(null, getValue(data.params.param.value) );
-        });
-    })
-    req.end(content)
-};
-
-Rtorrent.prototype.getAll = function(callback) {
-    cmds = {
-        'hash': 'd.get_hash=',
-        'name': 'd.get_name=',
-        'torrent': 'd.get_tied_to_file=',
-        'torrentsession': 'd.get_loaded_file=',
-        'path': 'd.get_base_path=',
-        'name': 'd.get_base_filename=',
-        'complete': 'd.get_complete=',
-        'size': 'd.get_size_bytes=',
-        'skip': 'd.get_skip_total=',
-        'completed': 'd.get_completed_bytes=',
-        'down_rate': 'd.get_down_rate=',
-        'down_total': 'd.get_down_total=',
-        'up_rate': 'd.get_up_rate=',
-        'up_total': 'd.get_up_total=',
-        'ratio': 'd.ratio=',
-        'message': 'd.get_message=',
-        'bitfield': 'd.get_bitfield=',
-        'chunk_size': 'd.get_chunk_size=',
-        'chunk_completed': 'd.get_completed_chunks=',
-        'files': 'd.get_size_files=',
-        'createdAt': 'd.creation_date=',
-        'trackersnb': 'd.get_tracker_size=',
-        'filesnb': 'd.get_size_files=',
-        'active': 'd.is_active=',
-        'open': 'd.is_open=',
-        'hashing': 'd.is_hash_checking=',
-        'hashed': 'd.is_hash_checked=',
-        'message': 'd.get_message=',
-        'state': 'd.get_state=',
-        'peers': 'd.get_peers_accounted=',
-    };
-
-    var callarray = ['default'];
-    for (var c in cmds)
-        callarray.push(cmds[c]);
-
-    this.get('d.multicall', callarray, function (err, torrents) {
-        if (err) return callback(err);
-
-        var res = [];
-        var r = 0;
-        for (var t in torrents)
-        {
-            res[r] = {};
-            var i = 0;
-            for (var c in cmds)
-                res[r][c] = torrents[t][i++];
-            r++;
-        }
-
-        callback(null, res);
-    });
-}
-
-
-function getValue(obj)
-{
+Rtorrent.prototype.getValue = function(obj) {
     var keys = Object.keys(obj);
+
     if (keys[0] == 'i4')
         return parseInt(obj[keys[0]]);
     else if (keys[0] == 'i8')
@@ -119,18 +127,81 @@ function getValue(obj)
     {
         var array = obj[keys[0]].data.value;
         if (!array.length)
-            return getValue(array);
+            return this.getValue(array);
 
         for (var i in array)
-            array[i] = getValue(array[i]);
+            array[i] = this.getValue(array[i]);
         return array;
     }
     else
-    {
-        console.log('unknown value type : '+keys[0]);
-        process.exit();
-    }
+        throw new Error('unknown value type : '+keys[0]);
 }
+
+Rtorrent.prototype.getAll = function(callback) {
+    var cmds = {
+        'hash': 'd.get_hash',
+        'name': 'd.get_name',
+        'torrent': 'd.get_tied_to_file',
+        'torrentsession': 'd.get_loaded_file',
+        'path': 'd.get_base_path',
+        'name': 'd.get_base_filename',
+        'complete': 'd.get_complete',
+        'size': 'd.get_size_bytes',
+        'skip': 'd.get_skip_total',
+        'completed': 'd.get_completed_bytes',
+        'down_rate': 'd.get_down_rate',
+        'down_total': 'd.get_down_total',
+        'up_rate': 'd.get_up_rate',
+        'up_total': 'd.get_up_total',
+        'ratio': 'd.ratio',
+        'message': 'd.get_message',
+        'bitfield': 'd.get_bitfield',
+        'chunk_size': 'd.get_chunk_size',
+        'chunk_completed': 'd.get_completed_chunks',
+        'files': 'd.get_size_files',
+        'createdAt': 'd.creation_date',
+        'trackersnb': 'd.get_tracker_size',
+        'filesnb': 'd.get_size_files',
+        'active': 'd.is_active',
+        'open': 'd.is_open',
+        'hashing': 'd.is_hash_checking',
+        'hashed': 'd.is_hash_checked',
+        'message': 'd.get_message',
+        'state': 'd.get_state',
+        'peers': 'd.get_peers_accounted',
+    };
+    var realthis = this;
+    var all = {};
+
+    this.get('download_list', [], function (err, hashes) {
+        if (err) return console.log('err: ', err);
+
+        async.mapLimit(hashes, 1, function(hash, asyncCallback) {
+            async.mapObject(cmds, function(cmd, asyncCallback2) {
+                cmd = cmd[Object.keys(cmd)[0]];
+
+                realthis.get(cmd, [hash], function (err, data) {
+                    if (err) return callback(err);
+
+                    asyncCallback2(err, data)
+                });
+            }, function(err, results){
+                if (err) return callback(err);
+
+                asyncCallback(err, results)
+            });
+        }, function(err, results){
+            if (err) return callback(err);
+
+            all.torrents = results;
+            callback(err, results);
+        });
+        
+    });
+}
+
+
+
 
 module.exports = Rtorrent;
 
@@ -147,5 +218,32 @@ var fields = {
   files : ['f.get_completed_chunks=', 'f.get_frozen_path=', 'f.is_created=', 'f.is_open=', 'f.get_last_touched=', 'f.get_match_depth_next=', 'f.get_match_depth_prev=', 'f.get_offset=', 'f.get_path=', 'f.get_path_components=', 'f.get_path_depth=', 'f.get_priority=', 'f.get_range_first=', 'f.get_range_second=', 'f.get_size_bytes=', 'f.get_size_chunks=']
 };
 
+$cmds = array(
+            't.get_url' => 'url',
+            't.get_min_interval' => 'min_interval',
+            't.get_normal_interval' => 'normal_interval',
+            't.get_scrape_complete' => 'scrape_complete',
+            't.get_scrape_downloaded' => 'scrape_downloaded',
+            't.get_scrape_incomplete' => 'scrape_incomplete',
+            't.get_scrape_time_last' => 'scrape_time_last',
+        );
+$cmds = array(
+            'f.get_range_first' => 'range_first',
+            'f.get_range_second' => 'range_second',
+            'f.get_size_bytes' => 'size',
+            'f.get_size_chunks' => 'chunks',
+            'f.get_completed_chunks' => 'completed_chunks',
+            'f.get_frozen_path' => 'fullpath',
+            'f.get_path' => 'path',
+        'f.get_priority' => 'priority',
+        );
+$cmds = array(
+      'get_up_rate' => 'up_rate',
+      'get_down_rate' => 'down_rate',
+      'get_up_total' => 'up_total',
+      'get_down_total' => 'down_total',
+);
+
+$alldata['free_diskspace'] = disk_free_space('/home');
 
 */
