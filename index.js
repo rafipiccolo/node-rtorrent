@@ -2,9 +2,9 @@
 var url = require("url")
 var scgi = require("scgi-stream")
 var xmlbuilder = require("xmlbuilder")
-var xml2json = require("xml2json").toJson;
 var async = require("async");
 var xmlrpc = require("xmlrpc");
+var xml2js = require("xml2js").parseString;
 
 function Rtorrent(option) {
     this.mode = (option && option['mode']) || "scgi";
@@ -70,12 +70,26 @@ Rtorrent.prototype.getScgi = function(method, params, callback ) {
             buff += data;
         });
         res.on('end',function() {
-            data = xml2json(buff, {object:true}).methodResponse;
-
-            if (data.fault)
-                callback( {code: realthis.getValue(data.fault.value.struct.member[0].value), message: realthis.getValue(data.fault.value.struct.member[1].value) });
-            else
-                callback(null, realthis.getValue(data.params.param.value) );
+            xml2js(buff, function (err, data) {
+                data = data.methodResponse;
+                if (data.fault)
+                    callback( {code: realthis.getValue(data.fault.value.struct.member[0].value), message: realthis.getValue(data.fault.value.struct.member[1].value) });
+                else
+                {
+		    if (!data.params.length)
+			callback(null, realthis.getValue(data.params.param.value) );
+		    else
+		    {
+			var array = [];
+			for (var i = 0; i < data.params.length; i++)
+{
+    console.log(data.params[i].param[0].value[0]);die();
+			    array[i] = realthis.getValue(data.params[i].param[0].value[0]);
+}
+			callback(null, array);
+		    }
+                }
+	    });
         });
     })
     req.end(content)
@@ -150,8 +164,6 @@ Rtorrent.prototype.getAll = function(callback) {
     realthis.getTorrents(function (err, torrents) {
         if (err) return console.log('err: ', err);
 
-        all.torrents = torrents;
-
         async.parallel([function (ac) {
 
             realthis.getGlobal(ac);
@@ -171,10 +183,11 @@ Rtorrent.prototype.getAll = function(callback) {
         }], function (err, results) {
 
             all = results[0];
+            all.torrents = torrents;
 
             for (var t in torrents) {
-                all.torrents[t].trackers = results[0][t];
-                all.torrents[t].files = results[1][t];
+                all.torrents[t].trackers = results[1][t];
+                all.torrents[t].files = results[2][t];
             }
             callback(err, all);
 
