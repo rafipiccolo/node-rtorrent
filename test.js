@@ -14,15 +14,6 @@ var rtorrent = new Rtorrent({
     pass: config.pass
 });
 
-
-
-
-rtorrent.getAll(function (err, data) {
-    if (err) return console.log('err: ', err);
-
-    console.log(JSON.stringify(data, null, 4));
-});
-
 /*
 // manual mode
 rtorrent.get('download_list', [], function (err, hashes) {
@@ -41,12 +32,13 @@ rtorrent.get('download_list', [], function (err, hashes) {
     }
 });
 
-// multicall : only with scgi
-rtorrent.get('d.multicall', ['default', 'd.name='], function (err, data) {
+// multicall
+rtorrent.getMulticall('d.multicall', ['main'], ['d.name=', 'd.get_hash'], function (err, data) {
     if (err) return console.log('err: ', err);
 
     console.log(data);
 });
+
 
 // everything in one shot
 rtorrent.getAll(function (err, data) {
@@ -54,4 +46,5 @@ rtorrent.getAll(function (err, data) {
 
     console.log(data);
 });
+
 */

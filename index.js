@@ -76,20 +76,20 @@ Rtorrent.prototype.getScgi = function(method, params, callback ) {
                     callback( {code: realthis.getValue(data.fault.value.struct.member[0].value), message: realthis.getValue(data.fault.value.struct.member[1].value) });
                 else
                 {
-		    if (!data.params.length)
-			callback(null, realthis.getValue(data.params.param.value) );
-		    else
-		    {
-			var array = [];
-			for (var i = 0; i < data.params.length; i++)
+                    if (!data.params.length)
+                        callback(null, realthis.getValue(data.params.param.value) );
+                    else
+                    {
+                        var array = [];
+                        for (var i = 0; i < data.params.length; i++)
 {
     console.log(data.params[i].param[0].value[0]);die();
-			    array[i] = realthis.getValue(data.params[i].param[0].value[0]);
+                            array[i] = realthis.getValue(data.params[i].param[0].value[0]);
 }
-			callback(null, array);
-		    }
+                        callback(null, array);
+                    }
                 }
-	    });
+            });
         });
     })
     req.end(content)
@@ -170,14 +170,20 @@ Rtorrent.prototype.getAll = function(callback) {
 
         },function (ac) {
 
-            async.mapLimit(torrents, 1, function(torrent, asyncCallback) {
-                realthis.getTorrentTrackers(torrent, asyncCallback);
+            async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
+                realthis.getTorrentTrackers(torrent.hash, asyncCallback);
             }, ac);
 
         }, function (ac) {
 
-            async.mapLimit(torrents, 1, function(torrent, asyncCallback) {
-                realthis.getTorrentFiles(torrent, asyncCallback);
+            async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
+                realthis.getTorrentFiles(torrent.hash, asyncCallback);
+            }, ac);
+
+        }, function (ac) {
+
+            async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
+                realthis.getTorrentPeers(torrent.hash, asyncCallback);
             }, ac);
 
         }], function (err, results) {
@@ -188,6 +194,7 @@ Rtorrent.prototype.getAll = function(callback) {
             for (var t in torrents) {
                 all.torrents[t].trackers = results[1][t];
                 all.torrents[t].files = results[2][t];
+                all.torrents[t].peers = results[3][t];
             }
             callback(err, all);
 
@@ -206,7 +213,6 @@ Rtorrent.prototype.getTorrents = function(callback) {
         torrentsession: 'd.get_loaded_file',
         path: 'd.get_base_path',
         name: 'd.get_base_filename',
-        complete: 'd.get_complete',
         size: 'd.get_size_bytes',
         skip: 'd.get_skip_total',
         completed: 'd.get_completed_bytes',
@@ -219,12 +225,10 @@ Rtorrent.prototype.getTorrents = function(callback) {
         bitfield: 'd.get_bitfield',
         chunk_size: 'd.get_chunk_size',
         chunk_completed: 'd.get_completed_chunks',
-        files: 'd.get_size_files',
         createdAt: 'd.creation_date',
-        trackersnb: 'd.get_tracker_size',
-        filesnb: 'd.get_size_files',
         active: 'd.is_active',
         open: 'd.is_open',
+        complete: 'd.get_complete',
         hashing: 'd.is_hash_checking',
         hashed: 'd.is_hash_checked',
         message: 'd.get_message',
@@ -235,11 +239,16 @@ Rtorrent.prototype.getTorrents = function(callback) {
     realthis.getMulticall('d.multicall', ['main'], cmds, callback);
 }
 
-Rtorrent.prototype.getTorrentTrackers = function(torrent, callback) {
+Rtorrent.prototype.getTorrentTrackers = function(hash, callback) {
     var realthis = this;
 
     var cmds = {
+        id: 't.get_id',
+        group: 't.get_group',
+        type: 't.get_type',
         url: 't.get_url',
+        enabled: 't.is_enabled',
+        open: 't.is_open',
         min_interval: 't.get_min_interval',
         normal_interval: 't.get_normal_interval',
         scrape_complete: 't.get_scrape_complete',
@@ -248,12 +257,10 @@ Rtorrent.prototype.getTorrentTrackers = function(torrent, callback) {
         scrape_time_last: 't.get_scrape_time_last',
     };
 
-    async.timesSeries(torrent.trackersnb, function(n, asyncCallback){
-        realthis.getMulticall('t.multicall', [torrent.hash, n], cmds, asyncCallback);
-    }, callback);
+    realthis.getMulticall('t.multicall', [hash, 0], cmds, callback);
 };
 
-Rtorrent.prototype.getTorrentFiles = function(torrent, callback) {
+Rtorrent.prototype.getTorrentFiles = function(hash, callback) {
     var realthis = this;
 
     var cmds = {
@@ -265,11 +272,36 @@ Rtorrent.prototype.getTorrentFiles = function(torrent, callback) {
         fullpath: 'f.get_frozen_path',
         path: 'f.get_path',
         priority: 'f.get_priority',
+        is_created: 'f.is_created=',
+        is_open: 'f.is_open=',
+        last_touched: 'f.get_last_touched=',
+        match_depth_next: 'f.get_match_depth_next=',
+        match_depth_prev: 'f.get_match_depth_prev=',
+        offset: 'f.get_offset=',
+        path_components: 'f.get_path_components=',
+        path_depth: 'f.get_path_depth=',
     };
 
-    async.timesSeries(torrent.filesnb, function(n, asyncCallback) {
-        realthis.getMulticall('f.multicall', [torrent.hash, n], cmds, asyncCallback);
-    }, callback);
+    realthis.getMulticall('f.multicall', [hash, 0], cmds, callback);
+}
+
+
+Rtorrent.prototype.getTorrentPeers = function(hash, callback) {
+    var realthis = this;
+
+    var cmds = {
+        address: 'p.get_address',
+        client_version: 'p.get_client_version',
+        completed_percent: 'p.get_completed_percent',
+        down_rate: 'p.get_down_rate',
+        down_total: 'p.get_down_total',
+        id: 'p.get_id',
+        port: 'p.get_port',
+        up_rate: 'p.get_up_rate',
+        up_total: 'p.get_up_total'
+    };
+
+    realthis.getMulticall('p.multicall', [hash, 0], cmds, callback);
 }
 
 Rtorrent.prototype.getGlobal = function(callback) {
@@ -280,6 +312,51 @@ Rtorrent.prototype.getGlobal = function(callback) {
         down_rate: 'get_down_rate',
         up_total: 'get_up_total',
         down_total: 'get_down_total',
+        bind: 'get_bind',
+        check_hash: 'get_check_hash',
+        dht_port: 'get_dht_port',
+        directory: 'get_directory',
+        download_rate: 'get_download_rate',
+        http_cacert: 'get_http_cacert',
+        http_capath: 'get_http_capath',
+        http_proxy: 'get_http_proxy',
+        ip: 'get_ip',
+        max_downloads_div: 'get_max_downloads_div',
+        max_downloads_global: 'get_max_downloads_global',
+        max_file_size: 'get_max_file_size',
+        max_memory_usage: 'get_max_memory_usage',
+        max_open_files: 'get_max_open_files',
+        max_open_http: 'get_max_open_http',
+        max_peers: 'get_max_peers',
+        max_peers_seed: 'get_max_peers_seed',
+        max_uploads: 'get_max_uploads',
+        max_uploads_global: 'get_max_uploads_global',
+        min_peers_seed: 'get_min_peers_seed',
+        min_peers: 'get_min_peers',
+        peer_exchange: 'get_peer_exchange',
+        port_open: 'get_port_open',
+        upload_rate: 'get_upload_rate',
+        port_random: 'get_port_random',
+        port_range: 'get_port_range',
+        preload_min_size: 'get_preload_min_size',
+        preload_required_rate: 'get_preload_required_rate',
+        preload_type: 'get_preload_type',
+        proxy_address: 'get_proxy_address',
+        receive_buffer_size: 'get_receive_buffer_size',
+        safe_sync: 'get_safe_sync',
+        scgi_dont_route: 'get_scgi_dont_route',
+        send_buffer_size: 'get_send_buffer_size',
+        session: 'get_session',
+        session_lock: 'get_session_lock',
+        session_on_completion: 'get_session_on_completion',
+        split_file_size: 'get_split_file_size',
+        split_suffix: 'get_split_suffix',
+        timeout_safe_sync: 'get_timeout_safe_sync',
+        timeout_sync: 'get_timeout_sync',
+        tracker_numwant: 'get_tracker_numwant',
+        use_udp_trackers: 'get_use_udp_trackers',
+        max_uploads_div: 'get_max_uploads_div',
+        max_open_sockets: 'get_max_open_sockets'
     };
     var cmdarray = [];
 
@@ -307,39 +384,6 @@ module.exports = Rtorrent;
 
 
 /*
-
-var fields = {
-  peers : ['p.get_address=', 'p.get_client_version=', 'p.get_completed_percent=', 'p.get_down_rate=', 'p.get_down_total=', 'p.get_id=', 'p.get_port=', 'p.get_up_rate=', 'p.get_up_total='],
-  tracker : ['t.get_group=', 't.get_id=', 't.get_min_interval=', 't.get_normal_interval=', 't.get_scrape_complete=', 't.get_scrape_downloaded=', 't.get_scrape_time_last=', 't.get_type=', 't.get_url=', 't.is_enabled=', 't.is_open=', 't.get_scrape_incomplete='],
-  system : ['get_bind', 'get_check_hash', 'get_dht_port', 'get_directory', 'get_download_rate', 'get_hash_interval', 'get_hash_max_tries', 'get_hash_read_ahead', 'get_http_cacert', 'get_http_capath', 'get_http_proxy', 'get_ip', 'get_max_downloads_div', 'get_max_downloads_global', 'get_max_file_size', 'get_max_memory_usage', 'get_max_open_files', 'get_max_open_http', 'get_max_peers', 'get_max_peers_seed', 'get_max_uploads', 'get_max_uploads_global', 'get_min_peers_seed', 'get_min_peers', 'get_peer_exchange', 'get_port_open', 'get_upload_rate', 'get_port_random', 'get_port_range', 'get_preload_min_size', 'get_preload_required_rate', 'get_preload_type', 'get_proxy_address', 'get_receive_buffer_size', 'get_safe_sync', 'get_scgi_dont_route', 'get_send_buffer_size', 'get_session', 'get_session_lock', 'get_session_on_completion', 'get_split_file_size', 'get_split_suffix', 'get_timeout_safe_sync', 'get_timeout_sync', 'get_tracker_numwant', 'get_use_udp_trackers', 'get_max_uploads_div', 'get_max_open_sockets'],
-  files : ['f.get_completed_chunks=', 'f.get_frozen_path=', 'f.is_created=', 'f.is_open=', 'f.get_last_touched=', 'f.get_match_depth_next=', 'f.get_match_depth_prev=', 'f.get_offset=', 'f.get_path=', 'f.get_path_components=', 'f.get_path_depth=', 'f.get_priority=', 'f.get_range_first=', 'f.get_range_second=', 'f.get_size_bytes=', 'f.get_size_chunks=']
-};
-
-$cmds = array(
-            't.get_url' => 'url',
-            't.get_min_interval' => 'min_interval',
-            't.get_normal_interval' => 'normal_interval',
-            't.get_scrape_complete' => 'scrape_complete',
-            't.get_scrape_downloaded' => 'scrape_downloaded',
-            't.get_scrape_incomplete' => 'scrape_incomplete',
-            't.get_scrape_time_last' => 'scrape_time_last',
-        );
-$cmds = array(
-            'f.get_range_first' => 'range_first',
-            'f.get_range_second' => 'range_second',
-            'f.get_size_bytes' => 'size',
-            'f.get_size_chunks' => 'chunks',
-            'f.get_completed_chunks' => 'completed_chunks',
-            'f.get_frozen_path' => 'fullpath',
-            'f.get_path' => 'path',
-        'f.get_priority' => 'priority',
-        );
-$cmds = array(
-      'get_up_rate' => 'up_rate',
-      'get_down_rate' => 'down_rate',
-      'get_up_total' => 'up_total',
-      'get_down_total' => 'down_total',
-);
 
 $alldata['free_diskspace'] = disk_free_space('/home');
 

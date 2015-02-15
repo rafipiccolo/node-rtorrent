@@ -1,5 +1,5 @@
 # node-rtorrent
-connect to rtorrent via scgi and retrieve everything !
+connect to rtorrent via scgi/xmlrpc and retrieve everything !
 
 
 ## Install rtorrent
@@ -54,7 +54,7 @@ now rtorrent is available with xmlrpc on
         if (err) return console.log('err: ', err);
 
         console.log(data);
-        // data is : [{hash: 'XXXXXX', name: 'ubuntu.iso', path: '/xxx', bitfield: ......... }, {...}]
+        // data is : {torrents: [{hash: 'XXXXXX', name: 'ubuntu.iso', path: '/xxx', bitfield: ......... }, {...}], up_total: ...}
     });
 
 ## More examples

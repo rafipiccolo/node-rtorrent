@@ -1,6 +1,6 @@
 {
   "name": "node-rtorrent",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "homepage": "https://github.com/rafi.piccolo/node-rtorrent",
   "description": "connect to rtorrent via scgi and retrieve everything !",
   "main": "index.js",
