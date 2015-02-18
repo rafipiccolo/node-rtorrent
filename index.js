@@ -372,8 +372,8 @@ Rtorrent.prototype.getGlobal = function(callback) {
         self.get(cmds[key], [], asyncCallback);
     }, function (err, data) {
         if (err) return callback(err);
-        var res = {};
 
+        var res = {};
         var i = 0;
         for (var key in cmds) {
             res[key] = data[i++];
@@ -382,56 +382,44 @@ Rtorrent.prototype.getGlobal = function(callback) {
     });
 }
 
-Rtorrent.prototype.start = function(hash, callBack) {
+Rtorrent.prototype.start = function(hash, callback) {
     var self = this;
     this.get('d.open', [hash], function(err, data) {
-        if(err) return callBack(err);
+        if(err) return callback(err);
 
-        self.get('d.start', [hash], function(err, data) {
-            if(err) return callBack(err);
-
-            return callBack(null)
-        })
+        self.get('d.start', [hash], callback);
     })
 };
 
-Rtorrent.prototype.stop = function(hash, callBack) {
+Rtorrent.prototype.stop = function(hash, callback) {
     var self = this;
     this.get('d.stop', [hash], function(err, data) {
-        if(err) return callBack(err);
+        if(err) return callback(err);
 
-        self.get('d.close', [hash], function(err, data) {
-            if(err) return callBack(err);
-
-            return callBack(null)
-        })
+        self.get('d.close', [hash], callback);
     })
 };
 
-Rtorrent.prototype.remove = function(hash, callBack) {
-    this.get('d.erase', [hash], function(err, data) {
-        if(err) return callBack(err);
-
-        return callBack(null)
-    })
+Rtorrent.prototype.remove = function(hash, callback) {
+    this.get('d.erase', [hash], , callback);
 };
 
-Rtorrent.prototype.upload = function(filePath, callBack) {
-    this.get('load', [filePath, 'd.open=', 'd.start='], function(err, val) {
-        if(err) return callBack(err);
-
-        callBack(null);
-    })
+Rtorrent.prototype.upload = function(filePath, callback) {
+    this.get('load', [filePath, 'd.open=', 'd.start='], callback);
 };
 
-Rtorrent.prototype.setPath = function(hash, directory, callBack) {
+Rtorrent.prototype.remove = function(hash, callback) {
+    this.get('d.erase', [hash], callback);
+};
+
+Rtorrent.prototype.setPath = function(hash, directory, callback) {
     this.get('d.set_directory', [hash, directory], callback);
 };
 
-Rtorrent.prototype.getFreeDiskSpace = function(callBack) {
+Rtorrent.prototype.getFreeDiskSpace = function(callback) {
     var self = this;
     this.get('d.multicall', ['default', 'd.free_diskspace='], function(err, data) {
-        if (err) return callBack(err, {});
+        if (err) return callback(err, {});
         
         var uniques = {};
         for (var i in data)
@@ -441,7 +429,7 @@ Rtorrent.prototype.getFreeDiskSpace = function(callBack) {
         for (var i in uniques)
             res.push(uniques[i]);
 
-        callBack(err, res);
+        callback(err, res);
     });
 };
 
