@@ -14,6 +14,12 @@ var rtorrent = new Rtorrent({
     pass: config.pass
 });
 
+rtorrent.getAll(function (err, data) {
+    if (err) return console.log('err: ', err);
+
+    console.log(data);
+});
+
 /*
 // manual mode
 rtorrent.get('download_list', [], function (err, hashes) {

@@ -62,7 +62,7 @@ Rtorrent.prototype.getXmlrpc = function(method, params, callback ) {
 Rtorrent.prototype.getScgi = function(method, params, callback ) {
     var content = this.makeSCGIXML(method, params)
     var req = scgi.request(this)
-    var realthis = this;
+    var self = this;
 
     req.on("response", function(res) {
         var buff = "";
@@ -73,18 +73,18 @@ Rtorrent.prototype.getScgi = function(method, params, callback ) {
             xml2js(buff, function (err, data) {
                 data = data.methodResponse;
                 if (data.fault)
-                    callback( {code: realthis.getValue(data.fault.value.struct.member[0].value), message: realthis.getValue(data.fault.value.struct.member[1].value) });
+                    callback( {code: self.getValue(data.fault.value.struct.member[0].value), message: self.getValue(data.fault.value.struct.member[1].value) });
                 else
                 {
                     if (!data.params.length)
-                        callback(null, realthis.getValue(data.params.param.value) );
+                        callback(null, self.getValue(data.params.param.value) );
                     else
                     {
                         var array = [];
                         for (var i = 0; i < data.params.length; i++)
 {
     console.log(data.params[i].param[0].value[0]);die();
-                            array[i] = realthis.getValue(data.params[i].param[0].value[0]);
+                            array[i] = self.getValue(data.params[i].param[0].value[0]);
 }
                         callback(null, array);
                     }
@@ -135,13 +135,13 @@ Rtorrent.prototype.getValue = function(obj) {
 
 
 Rtorrent.prototype.getMulticall = function(method, param, cmds, callback) {
-    var realthis = this;
+    var self = this;
     var cmdarray = param;
 
     for (var c in cmds)
         cmdarray.push(cmds[c]+'=');
 
-    realthis.get(method, cmdarray, function (err, data) {
+    self.get(method, cmdarray, function (err, data) {
         if (err) return callback(err);
 
         var res = [];
@@ -158,43 +158,48 @@ Rtorrent.prototype.getMulticall = function(method, param, cmds, callback) {
 }
 
 Rtorrent.prototype.getAll = function(callback) {
-    var realthis = this;
+    var self = this;
     var all = {};
 
-    realthis.getTorrents(function (err, torrents) {
+    self.getTorrents(function (err, torrents) {
         if (err) return console.log('err: ', err);
 
         async.parallel([function (ac) {
 
-            realthis.getGlobal(ac);
+            self.getGlobal(ac);
+
+        },function (ac) {
+
+            self.getFreeDiskSpace(ac);
 
         },function (ac) {
 
             async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
-                realthis.getTorrentTrackers(torrent.hash, asyncCallback);
+                self.getTorrentTrackers(torrent.hash, asyncCallback);
             }, ac);
 
         }, function (ac) {
 
             async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
-                realthis.getTorrentFiles(torrent.hash, asyncCallback);
+                self.getTorrentFiles(torrent.hash, asyncCallback);
             }, ac);
 
         }, function (ac) {
 
             async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
-                realthis.getTorrentPeers(torrent.hash, asyncCallback);
+                self.getTorrentPeers(torrent.hash, asyncCallback);
             }, ac);
 
         }], function (err, results) {
 
             all = results[0];
             all.torrents = torrents;
+            all.freeDiskSpace = results[1];
 
             for (var t in torrents) {
-                all.torrents[t].trackers = results[1][t];
-                all.torrents[t].files = results[2][t];
-                all.torrents[t].peers = results[3][t];
+                all.torrents[t].trackers = results[2][t];
+                all.torrents[t].files = results[3][t];
+                all.torrents[t].peers = results[4][t];
             }
             callback(err, all);
 
@@ -205,7 +210,7 @@ Rtorrent.prototype.getAll = function(callback) {
 
 
 Rtorrent.prototype.getTorrents = function(callback) {
-    var realthis = this;
+    var self = this;
 
     var cmds = {
         hash: 'd.get_hash',
@@ -236,11 +241,11 @@ Rtorrent.prototype.getTorrents = function(callback) {
         leechers: 'd.get_peers_accounted',
         seeders: 'd.get_peers_complete',
     };
-    realthis.getMulticall('d.multicall', ['main'], cmds, callback);
+    self.getMulticall('d.multicall', ['main'], cmds, callback);
 }
 
 Rtorrent.prototype.getTorrentTrackers = function(hash, callback) {
-    var realthis = this;
+    var self = this;
 
     var cmds = {
         id: 't.get_id',
@@ -257,11 +262,11 @@ Rtorrent.prototype.getTorrentTrackers = function(hash, callback) {
         scrape_time_last: 't.get_scrape_time_last',
     };
 
-    realthis.getMulticall('t.multicall', [hash, 0], cmds, callback);
+    self.getMulticall('t.multicall', [hash, 0], cmds, callback);
 };
 
 Rtorrent.prototype.getTorrentFiles = function(hash, callback) {
-    var realthis = this;
+    var self = this;
 
     var cmds = {
         range_first: 'f.get_range_first',
@@ -282,12 +287,12 @@ Rtorrent.prototype.getTorrentFiles = function(hash, callback) {
         path_depth: 'f.get_path_depth=',
     };
 
-    realthis.getMulticall('f.multicall', [hash, 0], cmds, callback);
+    self.getMulticall('f.multicall', [hash, 0], cmds, callback);
 }
 
 
 Rtorrent.prototype.getTorrentPeers = function(hash, callback) {
-    var realthis = this;
+    var self = this;
 
     var cmds = {
         address: 'p.get_address',
@@ -301,11 +306,11 @@ Rtorrent.prototype.getTorrentPeers = function(hash, callback) {
         up_total: 'p.get_up_total'
     };
 
-    realthis.getMulticall('p.multicall', [hash, 0], cmds, callback);
+    self.getMulticall('p.multicall', [hash, 0], cmds, callback);
 }
 
 Rtorrent.prototype.getGlobal = function(callback) {
-    var realthis = this;
+    var self = this;
 
     var cmds = {
         up_rate: 'get_up_rate',
@@ -364,7 +369,7 @@ Rtorrent.prototype.getGlobal = function(callback) {
         cmdarray.push(cmds[c]+'=');
 
     async.map(Object.keys(cmds), function(key, asyncCallback) {
-        realthis.get(cmds[key], [], asyncCallback);
+        self.get(cmds[key], [], asyncCallback);
     }, function (err, data) {
         if (err) return callback(err);
         var res = {};
@@ -376,6 +381,70 @@ Rtorrent.prototype.getGlobal = function(callback) {
         callback(err, res);
     });
 }
+
+Rtorrent.prototype.start = function(hash, callBack) {
+    var self = this;
+    this.get('d.open', [hash], function(err, data) {
+        if(err) return callBack(err);
+
+        self.get('d.start', [hash], function(err, data) {
+            if(err) return callBack(err);
+
+            return callBack(null)
+        })
+    })
+};
+
+Rtorrent.prototype.stop = function(hash, callBack) {
+    var self = this;
+    this.get('d.stop', [hash], function(err, data) {
+        if(err) return callBack(err);
+
+        self.get('d.close', [hash], function(err, data) {
+            if(err) return callBack(err);
+
+            return callBack(null)
+        })
+    })
+};
+
+Rtorrent.prototype.remove = function(hash, callBack) {
+    this.get('d.erase', [hash], function(err, data) {
+        if(err) return callBack(err);
+
+        return callBack(null)
+    })
+};
+
+Rtorrent.prototype.upload = function(filePath, callBack) {
+    this.get('load', [filePath, 'd.open=', 'd.start='], function(err, val) {
+        if(err) return callBack(err);
+
+        callBack(null);
+    })
+};
+
+Rtorrent.prototype.setPath = function(hash, directory, callBack) {
+    this.get('d.set_directory', [hash, directory], callback);
+};
+
+Rtorrent.prototype.getFreeDiskSpace = function(callBack) {
+    var self = this;
+    this.get('d.multicall', ['default', 'd.free_diskspace='], function(err, data) {
+        if (err) return callBack(err, {});
+        
+        var uniques = {};
+        for (var i in data)
+            uniques[data[i]] = data[i][0];
+
+        var res = [];
+        for (var i in uniques)
+            res.push(uniques[i]);
+
+        callBack(err, res);
+    });
+};
+
 
 module.exports = Rtorrent;
 
