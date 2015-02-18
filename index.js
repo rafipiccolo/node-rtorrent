@@ -401,7 +401,7 @@ Rtorrent.prototype.stop = function(hash, callback) {
 };
 
 Rtorrent.prototype.remove = function(hash, callback) {
-    this.get('d.erase', [hash], , callback);
+    this.get('d.erase', [hash], callback);
 };
 
 Rtorrent.prototype.upload = function(filePath, callback) {
