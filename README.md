@@ -1,5 +1,5 @@
 # node-rtorrent
-connect to rtorrent via scgi/xmlrpc and retrieve everything !
+control rtorrent with your nodejs project !
 
 
 ## Install rtorrent
@@ -44,10 +44,12 @@ now rtorrent is available with xmlrpc on
     var Rtorrent = require ('node-rtorrent');
 
     var rtorrent = new Rtorrent({
-        mode: 'scgi',
-        host: '127.0.0.1',
-        port: 5000,
-        path: '/'
+        mode: 'xmlrpc',
+        host: 'yourserver',
+        port: 80,
+        path: '/RPC2'
+        user: 'bob'
+        pass: 'marley'
     });
 
     rtorrent.getAll(function (err, data) {
@@ -55,6 +57,12 @@ now rtorrent is available with xmlrpc on
 
         console.log(data);
         // data is : {torrents: [{hash: 'XXXXXX', name: 'ubuntu.iso', path: '/xxx', bitfield: ......... }, {...}], up_total: ...}
+    });
+
+    rtorrent.start('XXXXXXXX', function (err, data) {
+        if (err) return console.log('err: ', err);
+
+        console.log(data);
     });
 
 ## More examples

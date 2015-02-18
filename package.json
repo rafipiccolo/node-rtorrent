@@ -2,7 +2,7 @@
   "name": "node-rtorrent",
   "version": "0.4.3",
   "homepage": "https://github.com/rafi.piccolo/node-rtorrent",
-  "description": "connect to rtorrent via scgi and retrieve everything !",
+  "description": "control rtorrent with your nodejs project !",
   "main": "index.js",
   "scripts": {
     "test": "test.js"

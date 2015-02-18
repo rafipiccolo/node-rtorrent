@@ -14,10 +14,10 @@ var rtorrent = new Rtorrent({
     pass: config.pass
 });
 
-rtorrent.getAll(function (err, data) {
+rtorrent.get('download_list', [], function (err, hashes) {
     if (err) return console.log('err: ', err);
 
-    console.log(data);
+    console.log(hashes);
 });
 
 /*
@@ -48,6 +48,14 @@ rtorrent.getMulticall('d.multicall', ['main'], ['d.name=', 'd.get_hash'], functi
 
 // everything in one shot
 rtorrent.getAll(function (err, data) {
+    if (err) return console.log('err: ', err);
+
+    console.log(data);
+});
+
+
+// start a torrent which is already registered in rtorrent
+rtorrent.start('XXXXXXXX', function (err, data) {
     if (err) return console.log('err: ', err);
 
     console.log(data);
