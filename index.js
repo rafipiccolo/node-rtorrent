@@ -262,7 +262,7 @@ Rtorrent.prototype.getTorrentTrackers = function(hash, callback) {
         scrape_time_last: 't.get_scrape_time_last',
     };
 
-    self.getMulticall('t.multicall', [hash, 0], cmds, callback);
+    self.getMulticall('t.multicall', [hash, ''], cmds, callback);
 };
 
 Rtorrent.prototype.getTorrentFiles = function(hash, callback) {
@@ -287,7 +287,7 @@ Rtorrent.prototype.getTorrentFiles = function(hash, callback) {
         path_depth: 'f.get_path_depth=',
     };
 
-    self.getMulticall('f.multicall', [hash, 0], cmds, callback);
+    self.getMulticall('f.multicall', [hash, ''], cmds, callback);
 }
 
 
@@ -306,7 +306,7 @@ Rtorrent.prototype.getTorrentPeers = function(hash, callback) {
         up_total: 'p.get_up_total'
     };
 
-    self.getMulticall('p.multicall', [hash, 0], cmds, callback);
+    self.getMulticall('p.multicall', [hash, ''], cmds, callback);
 }
 
 Rtorrent.prototype.getGlobal = function(callback) {
