@@ -1,6 +1,6 @@
 {
   "name": "node-rtorrent",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "homepage": "https://github.com/rafi.piccolo/node-rtorrent",
   "description": "control rtorrent with your nodejs project !",
   "main": "index.js",
