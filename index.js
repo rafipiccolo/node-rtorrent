@@ -259,11 +259,23 @@ Rtorrent.prototype.getTorrents = function(callback) {
         hashing: 'd.is_hash_checking',
         hashed: 'd.is_hash_checked',
         message: 'd.get_message',
-        state: 'd.get_state',
         leechers: 'd.get_peers_accounted',
         seeders: 'd.get_peers_complete',
     };
-    self.getMulticall('d.multicall', ['main'], cmds, callback);
+    self.getMulticall('d.multicall', ['main'], cmds, function (err, data) {
+        if (err) return callback(err);
+
+        for (var i in data)
+        {
+            data[i]['state'] = '';
+            if (data[i]['active'] == 1) data[i]['state'] += 'active ';
+            if (data[i]['open'] == 1) data[i]['state'] += 'open ';
+            if (data[i]['complete'] == 1) data[i]['state'] += 'complete ';
+            if (data[i]['hashing'] == 1) data[i]['state'] += 'hashing ';
+            if (data[i]['hashed'] == 1) data[i]['state'] += 'hashed ';
+        }
+        callback(err, data)
+    });
 }
 
 Rtorrent.prototype.getTorrentTrackers = function(hash, callback) {
