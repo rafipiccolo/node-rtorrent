@@ -1,8 +1,8 @@
 {
   "name": "node-rtorrent",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "homepage": "https://github.com/rafi.piccolo/node-rtorrent",
-  "description": "control rtorrent with your nodejs project !",
+  "description": "control rtorrent with your nodejs project (scgi or xmlrpc) !",
   "main": "index.js",
   "scripts": {
     "test": "test.js"

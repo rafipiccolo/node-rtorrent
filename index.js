@@ -7,7 +7,7 @@ var xmlrpc = require("xmlrpc");
 var xml2js = function (xml, callback) {
     var f = require('xml2js').parseString;
 
-    f(xml, {explicitArray: false}, callback);
+    f(xml, callback);
 };
 
 
@@ -77,15 +77,15 @@ Rtorrent.prototype.getScgi = function(method, params, callback ) {
         });
         res.on('end',function() {
 
-            xml2js(buff, function (err, res) {
+            xml2js(buff, function (err, data) {
                 try {
                     data = data.methodResponse;
                     if (data.fault)
-                        callback(new Error('commande scgi foireuse : ' + JSON.stringify(self.getValue(data.fault.value))));
+                        callback(new Error('commande scgi foireuse : ' + JSON.stringify(self.getValue(data.fault[0].value[0]))));
                     else
-                        callback(null, self.getValue(data.params.param.value));
+                        callback(null, self.getValue(data.params[0].param[0].value[0]));
                 } catch (e) {
-                    callback(e);
+                    callback(method+' : data not parsed : '+e+'\n'+buff);
                 }
 
             });
@@ -110,17 +110,17 @@ Rtorrent.prototype.makeSCGIXML = function(method, param ) {
     return root.end({pretty:false})
 }
 
-function getValue(obj)
+Rtorrent.prototype.getValue = function(obj)
 {
     var childname = Object.keys(obj)[0];
-    obj = obj[childname];
+    obj = obj[childname][0];
 
     if (childname == 'i4')
         return parseInt(obj);
     else if (childname == 'i8')
         return parseInt(obj);
     else if (childname == 'string')
-        return obj;
+        return obj.trim();
     else if (childname == 'struct')
     {
         var res = {};
@@ -136,17 +136,18 @@ function getValue(obj)
     }
     else if (childname == 'array')
     {
-        obj = obj[Object.keys(obj)[0]];
-        obj = obj[Object.keys(obj)[0]];
-        if (obj.length)
+        obj = obj.data;
+
+        var res = [];
+        for (var i in obj)
         {
-            var res = [];
-            for (var i in obj)
-                res.push(this.getValue(obj[i]));
-            return res;
+            for (var j in obj[i].value)
+            {
+                res.push(this.getValue(obj[i].value[j]));
+            }
         }
-        else
-            return this.getValue(obj)
+        return res;
+
     }
     else
         throw new Error('type inconnu : ' +  childname);
@@ -181,7 +182,7 @@ Rtorrent.prototype.getAll = function(callback) {
     var all = {};
 
     self.getTorrents(function (err, torrents) {
-        if (err) return console.log('err: ', err);
+        if (err) return callback(err);
 
         async.parallel([function (ac) {
 
@@ -193,23 +194,25 @@ Rtorrent.prototype.getAll = function(callback) {
 
         },function (ac) {
 
-            async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
+            async.mapLimit(torrents, 2, function(torrent, asyncCallback) {
                 self.getTorrentTrackers(torrent.hash, asyncCallback);
             }, ac);
 
         }, function (ac) {
 
-            async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
+            async.mapLimit(torrents, 2, function(torrent, asyncCallback) {
                 self.getTorrentFiles(torrent.hash, asyncCallback);
             }, ac);
 
         }, function (ac) {
 
-            async.mapLimit(torrents, 5, function(torrent, asyncCallback) {
+            async.mapLimit(torrents, 2, function(torrent, asyncCallback) {
                 self.getTorrentPeers(torrent.hash, asyncCallback);
             }, ac);
 
         }], function (err, results) {
+	    
+	    if (err) return callback(err, results);
 
             all = results[0];
             all.torrents = torrents;
@@ -387,7 +390,7 @@ Rtorrent.prototype.getGlobal = function(callback) {
     for (var c in cmds)
         cmdarray.push(cmds[c]+'=');
 
-    async.map(Object.keys(cmds), function(key, asyncCallback) {
+    async.mapLimit(Object.keys(cmds), 1, function(key, asyncCallback) {
         self.get(cmds[key], [], asyncCallback);
     }, function (err, data) {
         if (err) return callback(err);
