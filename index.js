@@ -230,6 +230,35 @@ Rtorrent.prototype.getAll = function(callback) {
     });
 }
 
+Rtorrent.prototype.getAllFast = function(callback) {
+    var self = this;
+    var all = {};
+
+    self.getTorrents(function (err, torrents) {
+        if (err) return callback(err);
+
+        async.parallel([function (ac) {
+
+            self.getGlobal(ac);
+
+        },function (ac) {
+
+            self.getFreeDiskSpace(ac);
+
+        }], function (err, results) {
+        
+        if (err) return callback(err, results);
+
+            all = results[0];
+            all.torrents = torrents;
+            all.freeDiskSpace = results[1];
+            
+            callback(err, all);
+        });
+        
+    });
+}
+
 
 Rtorrent.prototype.getTorrents = function(callback) {
     var self = this;
