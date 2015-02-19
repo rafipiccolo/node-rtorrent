@@ -4,7 +4,13 @@ var scgi = require("scgi-stream")
 var xmlbuilder = require("xmlbuilder")
 var async = require("async");
 var xmlrpc = require("xmlrpc");
-var xml2js = require("xml2js").parseString;
+var xml2js = function (xml, callback) {
+    var f = require('xml2js').parseString;
+
+    f(xml, {explicitArray: false}, callback);
+};
+
+
 
 function Rtorrent(option) {
     this.mode = (option && option['mode']) || "scgi";
@@ -70,26 +76,20 @@ Rtorrent.prototype.getScgi = function(method, params, callback ) {
             buff += data;
         });
         res.on('end',function() {
-            xml2js(buff, function (err, data) {
-                data = data.methodResponse;
-                if (data.fault)
-                    callback( {code: self.getValue(data.fault.value.struct.member[0].value), message: self.getValue(data.fault.value.struct.member[1].value) });
-                else
-                {
-                    if (!data.params.length)
-                        callback(null, self.getValue(data.params.param.value) );
+
+            xml2js(buff, function (err, res) {
+                try {
+                    data = data.methodResponse;
+                    if (data.fault)
+                        callback(new Error('commande scgi foireuse : ' + JSON.stringify(self.getValue(data.fault.value))));
                     else
-                    {
-                        var array = [];
-                        for (var i = 0; i < data.params.length; i++)
-{
-    console.log(data.params[i].param[0].value[0]);die();
-                            array[i] = self.getValue(data.params[i].param[0].value[0]);
-}
-                        callback(null, array);
-                    }
+                        callback(null, self.getValue(data.params.param.value));
+                } catch (e) {
+                    callback(e);
                 }
+
             });
+
         });
     })
     req.end(content)
@@ -110,27 +110,46 @@ Rtorrent.prototype.makeSCGIXML = function(method, param ) {
     return root.end({pretty:false})
 }
 
-Rtorrent.prototype.getValue = function(obj) {
-    var keys = Object.keys(obj);
+function getValue(obj)
+{
+    var childname = Object.keys(obj)[0];
+    obj = obj[childname];
 
-    if (keys[0] == 'i4')
-        return parseInt(obj[keys[0]]);
-    else if (keys[0] == 'i8')
-        return parseInt(obj[keys[0]]);
-    else if (keys[0] == 'string')
-        return obj[keys[0]];
-    else if (keys[0] == 'array')
+    if (childname == 'i4')
+        return parseInt(obj);
+    else if (childname == 'i8')
+        return parseInt(obj);
+    else if (childname == 'string')
+        return obj;
+    else if (childname == 'struct')
     {
-        var array = obj[keys[0]].data.value;
-        if (!array.length)
-            return this.getValue(array);
+        var res = {};
+        obj = obj[Object.keys(obj)[0]];
 
-        for (var i in array)
-            array[i] = this.getValue(array[i]);
-        return array;
+        for (var i in obj)
+        {
+            name = obj[i][Object.keys(obj[i])[0]];
+            value = this.getValue(obj[i][Object.keys(obj[i])[1]]);
+            res[name] = value;
+        }
+        return res;
+    }
+    else if (childname == 'array')
+    {
+        obj = obj[Object.keys(obj)[0]];
+        obj = obj[Object.keys(obj)[0]];
+        if (obj.length)
+        {
+            var res = [];
+            for (var i in obj)
+                res.push(this.getValue(obj[i]));
+            return res;
+        }
+        else
+            return this.getValue(obj)
     }
     else
-        throw new Error('unknown value type : '+keys[0]);
+        throw new Error('type inconnu : ' +  childname);
 }
 
 
