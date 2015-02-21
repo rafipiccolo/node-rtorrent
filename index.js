@@ -1,22 +1,13 @@
 
 var url = require("url")
-var scgi = require("scgi-stream")
-var xmlbuilder = require("xmlbuilder")
-var async = require("async");
 var xmlrpc = require("xmlrpc");
-var xml2js = function (xml, callback) {
-    var f = require('xml2js').parseString;
-
-    f(xml, callback);
-};
-
 
 
 function Rtorrent(option) {
-    this.mode = (option && option['mode']) || "scgi";
+    this.mode = (option && option['mode']) || "xmlrpc";
     this.host = (option && option['host']) || "127.0.0.1";
-    this.port = (option && option['port']) || 5000;
-    this.path = (option && option['path']) || "/";
+    this.port = (option && option['port']) || 80;
+    this.path = (option && option['path']) || "/RPC2";
     this.user = (option && option['user']) || null;
     this.pass = (option && option['pass']) || null;
     this.client = null;
@@ -43,116 +34,21 @@ function Rtorrent(option) {
             }
         }
 
-        client = xmlrpc.createClient(options);
-    }
-    else if (this.mode == 'scgi')
-    {
+        this.client = xmlrpc.createClient(options);
     }
     else
     {
-        throw new Error('unknown mode: '+this.mode+' (available: scgi/xmlrpc)');
+        throw new Error('unknown mode: '+this.mode+' (available: xmlrpc)');
     }
-}
+};
 
 Rtorrent.prototype.get = function(method, param, callback) {
-    if (this.mode == 'scgi')
-        return this.getScgi(method, param, callback);
-    else if (this.mode == 'xmlrpc')
-        return this.getXmlrpc(method, param, callback);
-}
+    return this.getXmlrpc(method, param, callback);
+};
 
 Rtorrent.prototype.getXmlrpc = function(method, params, callback ) {
-    client.methodCall(method, params, callback);
+    this.client.methodCall(method, params, callback);
 };
-
-Rtorrent.prototype.getScgi = function(method, params, callback ) {
-    var content = this.makeSCGIXML(method, params)
-    var req = scgi.request(this)
-    var self = this;
-
-    req.on("response", function(res) {
-        var buff = "";
-        res.on('data',function(data ) {
-            buff += data;
-        });
-        res.on('end',function() {
-
-            xml2js(buff, function (err, data) {
-                try {
-                    data = data.methodResponse;
-                    if (data.fault)
-                        callback(new Error('commande scgi foireuse : ' + JSON.stringify(self.getValue(data.fault[0].value[0]))));
-                    else
-                        callback(null, self.getValue(data.params[0].param[0].value[0]));
-                } catch (e) {
-                    callback(method+' : data not parsed : '+e+'\n'+buff);
-                }
-
-            });
-
-        });
-    })
-    req.end(content)
-};
-
-Rtorrent.prototype.makeSCGIXML = function(method, param ) {
-    var root = xmlbuilder.create('methodCall')
-    var methodName = root.ele("methodName", method)
-    if ( typeof param == 'string' )
-        param = [ param ] ;
-    if ( param && param.length > 0 ) {
-        var params = root.ele("params")
-        for ( var i = 0 ; i < param.length ; i += 1 ) {
-            var href = url.parse(param[i]).href
-            params.ele("param").ele("value", href)
-        }
-    }
-    return root.end({pretty:false})
-}
-
-Rtorrent.prototype.getValue = function(obj)
-{
-    var childname = Object.keys(obj)[0];
-    obj = obj[childname][0];
-
-    if (childname == 'i4')
-        return parseInt(obj);
-    else if (childname == 'i8')
-        return parseInt(obj);
-    else if (childname == 'string')
-        return obj.trim();
-    else if (childname == 'struct')
-    {
-        var res = {};
-        obj = obj[Object.keys(obj)[0]];
-
-        for (var i in obj)
-        {
-            name = obj[i][Object.keys(obj[i])[0]];
-            value = this.getValue(obj[i][Object.keys(obj[i])[1]]);
-            res[name] = value;
-        }
-        return res;
-    }
-    else if (childname == 'array')
-    {
-        obj = obj.data;
-
-        var res = [];
-        for (var i in obj)
-        {
-            for (var j in obj[i].value)
-            {
-                res.push(this.getValue(obj[i].value[j]));
-            }
-        }
-        return res;
-
-    }
-    else
-        throw new Error('type inconnu : ' +  childname);
-}
-
 
 Rtorrent.prototype.getMulticall = function(method, param, cmds, callback) {
     var self = this;
@@ -164,134 +60,73 @@ Rtorrent.prototype.getMulticall = function(method, param, cmds, callback) {
     self.get(method, cmdarray, function (err, data) {
         if (err) return callback(err);
 
-        var res = [];
-        for (var d in data)
-        {
-            var i = 0;
-            res[d] = {};
-            for (var c in cmds)
-                res[d][c] = data[d][i++];
-        }
-
+        var res = doublearray2hash(data, Object.keys(cmds));
         callback(err, res);
     });
-}
+};
 
 Rtorrent.prototype.getAll = function(callback) {
     var self = this;
-    var all = {};
 
-    self.getTorrents(function (err, torrents) {
+    self.getGlobals(function (err, globals) {
         if (err) return callback(err);
 
-        async.parallel([function (ac) {
+        self.getTorrents(function (err, torrents) {
+            if (err) return callback(err);
 
-            self.getGlobal(ac);
-
-        },function (ac) {
-
-            self.getFreeDiskSpace(ac);
-
-        },function (ac) {
-
-            async.mapLimit(torrents, 2, function(torrent, asyncCallback) {
-                self.getTorrentTrackers(torrent.hash, asyncCallback);
-            }, ac);
-
-        }, function (ac) {
-
-            async.mapLimit(torrents, 2, function(torrent, asyncCallback) {
-                self.getTorrentFiles(torrent.hash, asyncCallback);
-            }, ac);
-
-        }, function (ac) {
-
-            async.mapLimit(torrents, 2, function(torrent, asyncCallback) {
-                self.getTorrentPeers(torrent.hash, asyncCallback);
-            }, ac);
-
-        }], function (err, results) {
-	    
-	    if (err) return callback(err, results);
-
-            all = results[0];
-            all.torrents = torrents;
-            all.freeDiskSpace = results[1];
+            var array = [];
 
             for (var t in torrents) {
-                all.torrents[t].trackers = results[2][t];
-                all.torrents[t].files = results[3][t];
-                all.torrents[t].peers = results[4][t];
+                var params = [];
+                params.push(torrents[t].hash);
+                params.push('');
+                for (var f in fields.files)
+                    params.push(fields.files[f]+'=');
+                array.push({'methodName': 'f.multicall', params: params})
             }
-            callback(err, all);
 
+            for (var t in torrents) {
+                var params = [];
+                params.push(torrents[t].hash);
+                params.push('');
+                for (var f in fields.trackers)
+                    params.push(fields.trackers[f]+'=');
+                array.push({'methodName': 't.multicall', params: params})
+            }
+
+            for (var t in torrents) {
+                var params = [];
+                params.push(torrents[t].hash);
+                params.push('');
+                for (var f in fields.peers)
+                    params.push(fields.peers[f]+'=');
+                array.push({'methodName': 'p.multicall', params: params})
+            }
+
+            self.getXmlrpc('system.multicall', [array], function (err, data) {
+
+                var nb = torrents.length;
+                for (var i = 0; i < nb; i++)
+                {
+                    torrents[i]['files'] = doublearray2hash(data[i][0], Object.keys(fields.files));
+                    torrents[i]['trackers'] = doublearray2hash(data[i+nb][0], Object.keys(fields.trackers));
+                    torrents[i]['peers'] = doublearray2hash(data[i+nb+nb][0], Object.keys(fields.peers));
+                }
+
+                for (var t in torrents)
+                    globals.free_disk_space = torrents[t].free_disk_space;
+
+                globals.torrents = torrents;
+                callback(err, globals)
+            });
         });
-        
     });
-}
-
-Rtorrent.prototype.getAllFast = function(callback) {
-    var self = this;
-    var all = {};
-
-    self.getTorrents(function (err, torrents) {
-        if (err) return callback(err);
-
-        async.parallel([function (ac) {
-
-            self.getGlobal(ac);
-
-        },function (ac) {
-
-            self.getFreeDiskSpace(ac);
-
-        }], function (err, results) {
-        
-        if (err) return callback(err, results);
-
-            all = results[0];
-            all.torrents = torrents;
-            all.freeDiskSpace = results[1];
-            
-            callback(err, all);
-        });
-        
-    });
-}
-
+};
 
 Rtorrent.prototype.getTorrents = function(callback) {
     var self = this;
 
-    var cmds = {
-        hash: 'd.get_hash',
-        torrent: 'd.get_tied_to_file',
-        torrentsession: 'd.get_loaded_file',
-        path: 'd.get_base_path',
-        name: 'd.get_base_filename',
-        size: 'd.get_size_bytes',
-        skip: 'd.get_skip_total',
-        completed: 'd.get_completed_bytes',
-        down_rate: 'd.get_down_rate',
-        down_total: 'd.get_down_total',
-        up_rate: 'd.get_up_rate',
-        up_total: 'd.get_up_total',
-        ratio: 'd.ratio',
-        message: 'd.get_message',
-        bitfield: 'd.get_bitfield',
-        chunk_size: 'd.get_chunk_size',
-        chunk_completed: 'd.get_completed_chunks',
-        createdAt: 'd.creation_date',
-        active: 'd.is_active',
-        open: 'd.is_open',
-        complete: 'd.get_complete',
-        hashing: 'd.is_hash_checking',
-        hashed: 'd.is_hash_checked',
-        message: 'd.get_message',
-        leechers: 'd.get_peers_accounted',
-        seeders: 'd.get_peers_complete',
-    };
-    self.getMulticall('d.multicall', ['main'], cmds, function (err, data) {
+    self.getMulticall('d.multicall', ['main'], fields.torrents, function (err, data) {
         if (err) return callback(err);
 
         for (var i in data)
@@ -305,77 +140,82 @@ Rtorrent.prototype.getTorrents = function(callback) {
         }
         callback(err, data)
     });
-}
+};
 
 Rtorrent.prototype.getTorrentTrackers = function(hash, callback) {
-    var self = this;
-
-    var cmds = {
-        id: 't.get_id',
-        group: 't.get_group',
-        type: 't.get_type',
-        url: 't.get_url',
-        enabled: 't.is_enabled',
-        open: 't.is_open',
-        min_interval: 't.get_min_interval',
-        normal_interval: 't.get_normal_interval',
-        scrape_complete: 't.get_scrape_complete',
-        scrape_downloaded: 't.get_scrape_downloaded',
-        scrape_incomplete: 't.get_scrape_incomplete',
-        scrape_time_last: 't.get_scrape_time_last',
-    };
-
-    self.getMulticall('t.multicall', [hash, ''], cmds, callback);
+    this.getMulticall('t.multicall', [hash, ''], fields.trackers, callback);
 };
 
 Rtorrent.prototype.getTorrentFiles = function(hash, callback) {
-    var self = this;
-
-    var cmds = {
-        range_first: 'f.get_range_first',
-        range_second: 'f.get_range_second',
-        size: 'f.get_size_bytes',
-        chunks: 'f.get_size_chunks',
-        completed_chunks: 'f.get_completed_chunks',
-        fullpath: 'f.get_frozen_path',
-        path: 'f.get_path',
-        priority: 'f.get_priority',
-        is_created: 'f.is_created=',
-        is_open: 'f.is_open=',
-        last_touched: 'f.get_last_touched=',
-        match_depth_next: 'f.get_match_depth_next=',
-        match_depth_prev: 'f.get_match_depth_prev=',
-        offset: 'f.get_offset=',
-        path_components: 'f.get_path_components=',
-        path_depth: 'f.get_path_depth=',
-    };
-
-    self.getMulticall('f.multicall', [hash, ''], cmds, callback);
-}
-
+    this.getMulticall('f.multicall', [hash, ''], fields.files, callback);
+};
 
 Rtorrent.prototype.getTorrentPeers = function(hash, callback) {
+    this.getMulticall('p.multicall', [hash, ''], fields.peers, callback);
+};
+
+Rtorrent.prototype.systemMulticall = function(cmds, callback) {
+    var array = [];
+
+    for (i in cmds)
+        array.push({
+            'methodName': cmds[i],
+            'params': [],
+        });
+
+    this.getXmlrpc('system.multicall', [array], function (err, data) {
+        if (err) return callback(err);
+
+        var res = {};
+        var i = 0;
+        for (var key in cmds)
+            res[key] = data[i++][0];
+        callback(err, res);
+    });
+};
+
+Rtorrent.prototype.getGlobals = function(callback) {
+   this.systemMulticall(fields.global, callback);
+};
+
+Rtorrent.prototype.start = function(hash, callback) {
     var self = this;
+    this.get('d.open', [hash], function(err, data) {
+        if(err) return callback(err);
 
-    var cmds = {
-        address: 'p.get_address',
-        client_version: 'p.get_client_version',
-        completed_percent: 'p.get_completed_percent',
-        down_rate: 'p.get_down_rate',
-        down_total: 'p.get_down_total',
-        id: 'p.get_id',
-        port: 'p.get_port',
-        up_rate: 'p.get_up_rate',
-        up_total: 'p.get_up_total'
-    };
+        self.get('d.start', [hash], callback);
+    })
+};
 
-    self.getMulticall('p.multicall', [hash, ''], cmds, callback);
-}
-
-Rtorrent.prototype.getGlobal = function(callback) {
+Rtorrent.prototype.stop = function(hash, callback) {
     var self = this;
+    this.get('d.stop', [hash], function(err, data) {
+        if(err) return callback(err);
 
-    var cmds = {
+        self.get('d.close', [hash], callback);
+    })
+};
+
+Rtorrent.prototype.remove = function(hash, callback) {
+    this.get('d.erase', [hash], callback);
+};
+
+Rtorrent.prototype.upload = function(filePath, callback) {
+    this.get('load', [filePath, 'd.open=', 'd.start='], callback);
+};
+
+Rtorrent.prototype.setPath = function(hash, directory, callback) {
+    this.get('d.set_directory', [hash, directory], callback);
+};
+
+module.exports = Rtorrent;
+
+
+
+
+
+var fields = {
+    global: {
         up_rate: 'get_up_rate',
         down_rate: 'get_down_rate',
         up_total: 'get_up_total',
@@ -425,86 +265,94 @@ Rtorrent.prototype.getGlobal = function(callback) {
         use_udp_trackers: 'get_use_udp_trackers',
         max_uploads_div: 'get_max_uploads_div',
         max_open_sockets: 'get_max_open_sockets'
-    };
-    var cmdarray = [];
+    },
+    peers: {
+        address: 'p.get_address',
+        client_version: 'p.get_client_version',
+        completed_percent: 'p.get_completed_percent',
+        down_rate: 'p.get_down_rate',
+        down_total: 'p.get_down_total',
+        id: 'p.get_id',
+        port: 'p.get_port',
+        up_rate: 'p.get_up_rate',
+        up_total: 'p.get_up_total'
+    },
+    files: {
+        range_first: 'f.get_range_first',
+        range_second: 'f.get_range_second',
+        size: 'f.get_size_bytes',
+        chunks: 'f.get_size_chunks',
+        completed_chunks: 'f.get_completed_chunks',
+        fullpath: 'f.get_frozen_path',
+        path: 'f.get_path',
+        priority: 'f.get_priority',
+        is_created: 'f.is_created=',
+        is_open: 'f.is_open=',
+        last_touched: 'f.get_last_touched=',
+        match_depth_next: 'f.get_match_depth_next=',
+        match_depth_prev: 'f.get_match_depth_prev=',
+        offset: 'f.get_offset=',
+        path_components: 'f.get_path_components=',
+        path_depth: 'f.get_path_depth=',
+    },
+    trackers: {
+        id: 't.get_id',
+        group: 't.get_group',
+        type: 't.get_type',
+        url: 't.get_url',
+        enabled: 't.is_enabled',
+        open: 't.is_open',
+        min_interval: 't.get_min_interval',
+        normal_interval: 't.get_normal_interval',
+        scrape_complete: 't.get_scrape_complete',
+        scrape_downloaded: 't.get_scrape_downloaded',
+        scrape_incomplete: 't.get_scrape_incomplete',
+        scrape_time_last: 't.get_scrape_time_last',
+    },
+    torrents: {
+        hash: 'd.get_hash',
+        torrent: 'd.get_tied_to_file',
+        torrentsession: 'd.get_loaded_file',
+        path: 'd.get_base_path',
+        name: 'd.get_base_filename',
+        size: 'd.get_size_bytes',
+        skip: 'd.get_skip_total',
+        completed: 'd.get_completed_bytes',
+        down_rate: 'd.get_down_rate',
+        down_total: 'd.get_down_total',
+        up_rate: 'd.get_up_rate',
+        up_total: 'd.get_up_total',
+        ratio: 'd.ratio',
+        message: 'd.get_message',
+        bitfield: 'd.get_bitfield',
+        chunk_size: 'd.get_chunk_size',
+        chunk_completed: 'd.get_completed_chunks',
+        createdAt: 'd.creation_date',
+        active: 'd.is_active',
+        open: 'd.is_open',
+        complete: 'd.get_complete',
+        hashing: 'd.is_hash_checking',
+        hashed: 'd.is_hash_checked',
+        message: 'd.get_message',
+        leechers: 'd.get_peers_accounted',
+        seeders: 'd.get_peers_complete',
+        free_disk_space: 'd.free_diskspace',
+    },
+};
 
-    for (var c in cmds)
-        cmdarray.push(cmds[c]+'=');
 
-    async.mapLimit(Object.keys(cmds), 1, function(key, asyncCallback) {
-        self.get(cmds[key], [], asyncCallback);
-    }, function (err, data) {
-        if (err) return callback(err);
 
-        var res = {};
-        var i = 0;
-        for (var key in cmds) {
-            res[key] = data[i++];
-        };
-        callback(err, res);
-    });
+function array2hash(array, keys) {
+    var i = 0;
+    var res = {};
+    for (var k in keys) {
+        res[keys[k]] = array[i++];
+    }
+    return res;
 }
 
-Rtorrent.prototype.start = function(hash, callback) {
-    var self = this;
-    this.get('d.open', [hash], function(err, data) {
-        if(err) return callback(err);
-
-        self.get('d.start', [hash], callback);
-    })
-};
-
-Rtorrent.prototype.stop = function(hash, callback) {
-    var self = this;
-    this.get('d.stop', [hash], function(err, data) {
-        if(err) return callback(err);
-
-        self.get('d.close', [hash], callback);
-    })
-};
-
-Rtorrent.prototype.remove = function(hash, callback) {
-    this.get('d.erase', [hash], callback);
-};
-
-Rtorrent.prototype.upload = function(filePath, callback) {
-    this.get('load', [filePath, 'd.open=', 'd.start='], callback);
-};
-
-Rtorrent.prototype.remove = function(hash, callback) {
-    this.get('d.erase', [hash], callback);
-};
-
-Rtorrent.prototype.setPath = function(hash, directory, callback) {
-    this.get('d.set_directory', [hash, directory], callback);
-};
-
-Rtorrent.prototype.getFreeDiskSpace = function(callback) {
-    var self = this;
-    this.get('d.multicall', ['default', 'd.free_diskspace='], function(err, data) {
-        if (err) return callback(err, {});
-        
-        var uniques = {};
-        for (var i in data)
-            uniques[data[i]] = data[i][0];
-
-        var res = [];
-        for (var i in uniques)
-            res.push(uniques[i]);
-
-        callback(err, res);
-    });
-};
-
-
-module.exports = Rtorrent;
-
-
-
-
-
-/*
-
-$alldata['free_diskspace'] = disk_free_space('/home');
-
-*/
+function doublearray2hash(array, keys) {
+    for (var i in array)
+        array[i] = array2hash(array[i], keys);
+    return array;
+}

@@ -12,7 +12,7 @@ now rtorrent is available (only from localhost) with scgi on :
     127.0.0.1:5000/
 
 
-## for xmlrpc connexion mode (optional)
+## set xmlrpc connexion mode
 open apache config file and add :
 
     SCGIMount /RPC2 127.0.0.1:5000

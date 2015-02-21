@@ -15,10 +15,11 @@ var rtorrent = new Rtorrent({
 });
 
 
-rtorrent.getAll(function (err, hashes) {
+
+rtorrent.getAll(function (err, data) {
     if (err) return console.log('err: ', err);
 
-    console.log(hashes);
+    console.log(JSON.stringify(data, null, 4));
 });
 
 
