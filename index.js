@@ -202,12 +202,12 @@ Rtorrent.prototype.remove = function(hash, callback) {
 };
 
 Rtorrent.prototype.loadLink = function(link, callback) {
-    this.get('load', [link, 'd.open=', 'd.start='], callback);
+    this.get('load_start', [link], callback);
 };
 
 Rtorrent.prototype.loadFile = function(filePath, callback) {
     var file = fs.readFileSync(filePath);
-    this.get('load_raw', [file, 'd.open=', 'd.start='], callback);
+    this.get('load_raw_start', [file], callback);
 };
 
 Rtorrent.prototype.setPath = function(hash, directory, callback) {
