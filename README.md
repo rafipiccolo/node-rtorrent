@@ -65,6 +65,21 @@ now rtorrent is available with xmlrpc on
         console.log(data);
     });
 
-## More examples
+    rtorrent.loadLink(...
 
-[Click here !](test.js)
+    rtorrent.loadFile(...
+
+
+and more : [Click here !](test.js)
+
+
+## use from command line
+
+    USAGE: node-rtorrent cmd ...
+
+    Exemples:
+        node-rtorrent download_list
+        node-rtorrent d.multicall main d.name= d.get_base_path
+        node-rtorrent t.multicall XXXXXXX t.id= t.url=
+        node-rtorrent load "magnet:?xt=urn:xxxx"
+        node-rtorrent load "http://xxx/xxx.torrent"

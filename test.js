@@ -1,8 +1,7 @@
 var Rtorrent = require('./index.js');
 
-var yaml = require('js-yaml');
-var fs   = require('fs');
-var config = yaml.safeLoad(fs.readFileSync(__dirname+'/config.yml', 'utf8'));
+
+var config = require('./config.json');
 
 
 var rtorrent = new Rtorrent({
@@ -15,11 +14,10 @@ var rtorrent = new Rtorrent({
 });
 
 
-
 rtorrent.getAll(function (err, data) {
     if (err) return console.log('err: ', err);
 
-    console.log(JSON.stringify(data, null, 4));
+    console.log(data);
 });
 
 
@@ -41,8 +39,9 @@ rtorrent.get('download_list', [], function (err, hashes) {
     }
 });
 
+
 // multicall
-rtorrent.getMulticall('d.multicall', ['main'], ['d.name=', 'd.get_hash'], function (err, data) {
+rtorrent.getMulticall('d.multicall', ['main'], {name: 'd.name=', hash: 'd.get_hash'}, function (err, data) {
     if (err) return console.log('err: ', err);
 
     console.log(data);
@@ -57,7 +56,21 @@ rtorrent.getAll(function (err, data) {
 });
 
 
-// start a torrent which is already registered in rtorrent
+rtorrent.loadLink('magnet link or http torrent file', function (err, data) {
+    if (err) return console.log('err: ', err);
+
+    console.log(JSON.stringify(data, null, 4));
+});
+
+
+rtorrent.loadFile('local torrent file', function (err, data) {
+    if (err) return console.log('err: ', err);
+
+    console.log(JSON.stringify(data, null, 4));
+});
+
+
+// start a torrent which is already registered in rtorrent with its hash
 rtorrent.start('XXXXXXXX', function (err, data) {
     if (err) return console.log('err: ', err);
 

@@ -1,11 +1,14 @@
 {
   "name": "node-rtorrent",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "homepage": "https://github.com/rafi.piccolo/node-rtorrent",
   "description": "control rtorrent with your nodejs project !",
   "main": "index.js",
   "scripts": {
     "test": "test.js"
+  },
+  "bin": {
+    "filesearch" : "cli.js"
   },
   "repository": {
     "type": "git",

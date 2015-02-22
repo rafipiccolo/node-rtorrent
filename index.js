@@ -1,5 +1,6 @@
 
 var url = require("url")
+var fs = require('fs');
 var xmlrpc = require("xmlrpc");
 
 
@@ -200,8 +201,13 @@ Rtorrent.prototype.remove = function(hash, callback) {
     this.get('d.erase', [hash], callback);
 };
 
-Rtorrent.prototype.upload = function(filePath, callback) {
-    this.get('load', [filePath, 'd.open=', 'd.start='], callback);
+Rtorrent.prototype.loadLink = function(link, callback) {
+    this.get('load', [link, 'd.open=', 'd.start='], callback);
+};
+
+Rtorrent.prototype.loadFile = function(filePath, callback) {
+    var file = fs.readFileSync(filePath);
+    this.get('load_raw', [file, 'd.open=', 'd.start='], callback);
 };
 
 Rtorrent.prototype.setPath = function(hash, directory, callback) {
