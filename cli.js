@@ -23,8 +23,9 @@ if (process.argv.length <= 2) {
     console.log('  node-rtorrent download_list');
     console.log('  node-rtorrent d.multicall main d.name= d.get_base_path=');
     console.log('  node-rtorrent t.multicall XXXXXXX t.id= t.url=');
-    console.log('  node-rtorrent load "magnet:?xt=urn:xxxx"');
-    console.log('  node-rtorrent load "http://xxx/xxx.torrent"');
+    console.log('  node-rtorrent load_start "magnet:?xt=urn:xxxx"');
+    console.log('  node-rtorrent load_start "http://xxx/xxx.torrent"');
+    console.log('  node-rtorrent execute_capture bash -c "ls -la /"');
     process.exit();
 }
 

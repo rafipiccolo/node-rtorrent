@@ -133,11 +133,18 @@ Rtorrent.prototype.getTorrents = function(callback) {
         for (var i in data)
         {
             data[i]['state'] = '';
-            if (data[i]['active'] == 1) data[i]['state'] += 'active ';
-            if (data[i]['open'] == 1) data[i]['state'] += 'open ';
-            if (data[i]['complete'] == 1) data[i]['state'] += 'complete ';
-            if (data[i]['hashing'] == 1) data[i]['state'] += 'hashing ';
-            if (data[i]['hashed'] == 1) data[i]['state'] += 'hashed ';
+            if (data[i]['active'] == 1)
+                data[i]['state'] += 'active ';
+            if (data[i]['open'] == 1)
+                data[i]['state'] += 'open ';
+            if (data[i]['complete'] == 1)
+                data[i]['state'] += 'complete ';
+            if (data[i]['hashing'] == 1)
+                data[i]['state'] += 'hashing ';
+            if (data[i]['hashed'] == 1)
+                data[i]['state'] += 'hashed ';
+            if (data[i]['down_total'] < data[i]['completed'])
+                data[i]['down_total'] = data[i]['completed'];
         }
         callback(err, data)
     });
