@@ -143,10 +143,9 @@ Rtorrent.prototype.getTorrents = function(callback) {
                 data[i]['state'] += 'hashing ';
             if (data[i]['hashed'] == 1)
                 data[i]['state'] += 'hashed ';
-            if (data[i]['down_total'] < data[i]['completed']) {
+            if (data[i]['down_total'] < data[i]['completed'])
                 data[i]['down_total'] = data[i]['completed'];
-                data[i]['ratio'] = data[i]['up_total']/data[i]['down_total'];
-            }
+            data[i]['ratio'] = data[i]['up_total']/data[i]['down_total'];
         }
         callback(err, data)
     });
@@ -337,7 +336,6 @@ var fields = {
         down_total: 'd.get_down_total',
         up_rate: 'd.get_up_rate',
         up_total: 'd.get_up_total',
-        ratio: 'd.ratio',
         message: 'd.get_message',
         bitfield: 'd.get_bitfield',
         chunk_size: 'd.get_chunk_size',
