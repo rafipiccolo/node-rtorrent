@@ -43,12 +43,17 @@ function Rtorrent(option) {
     }
 };
 
+
 Rtorrent.prototype.get = function(method, param, callback) {
     return this.getXmlrpc(method, param, callback);
 };
 
 Rtorrent.prototype.getXmlrpc = function(method, params, callback ) {
     this.client.methodCall(method, params, callback);
+};
+
+Rtorrent.prototype.execute = function(cmd, callback) {
+    return this.get('execute_capture', ['bash', '-c', cmd], callback);
 };
 
 Rtorrent.prototype.getMulticall = function(method, param, cmds, callback) {
@@ -215,8 +220,13 @@ Rtorrent.prototype.loadLink = function(link, callback) {
 
 Rtorrent.prototype.loadFile = function(filePath, callback) {
     var file = fs.readFileSync(filePath);
-    this.get('load_raw_start', [file], callback);
+    this.loadFileContent(file, callback);
 };
+
+Rtorrent.prototype.loadFileContent = function(filecontent, callback) {
+    this.get('load_raw_start', [filecontent], callback);
+};
+
 
 Rtorrent.prototype.setPath = function(hash, directory, callback) {
     this.get('d.set_directory', [hash, directory], callback);

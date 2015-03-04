@@ -1,6 +1,7 @@
 # node-rtorrent
 control rtorrent with your nodejs project !
 
+![alt tag](https://nodei.co/npm/node-rtorrent.png?downloads=true&stars=true)
 
 ## Install rtorrent
 check in config file (/home/user/.rtorrent.rc) that this line exist :
@@ -78,8 +79,9 @@ and more : [Click here !](test.js)
     USAGE: node-rtorrent cmd ...
 
     Exemples:
-        node-rtorrent download_list
-        node-rtorrent d.multicall main d.name= d.get_base_path
-        node-rtorrent t.multicall XXXXXXX t.id= t.url=
-        node-rtorrent load "magnet:?xt=urn:xxxx"
-        node-rtorrent load "http://xxx/xxx.torrent"
+        node-rtorrent get download_list
+        node-rtorrent get d.multicall main d.name= d.get_base_path
+        node-rtorrent get t.multicall XXXXXXX t.id= t.url=
+        node-rtorrent get load "magnet:?xt=urn:xxxx"
+        node-rtorrent get load "http://xxx/xxx.torrent"
+        node-rtorrent getAll
